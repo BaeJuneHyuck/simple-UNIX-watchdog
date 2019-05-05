@@ -10,12 +10,22 @@
 #include <errno.h>
 
 #define MAX_PATH 100
-struct stat cur_stat[10];         // 3 directories, 7 files
+#define KST 9
+struct stat cur_stat[10];   // 3 directories, 7 files
 struct stat prev_stat[10];  // previous stat
 bool first_compare;
-//char filename[10][MAX_PATH];
-
 char filename[12][MAX_PATH];
+
+void alert(char* name, char *message){
+    time_t t;
+    struct tm *info;
+    char time_str[15];
+    time(&t);
+    info = gmtime(&t);
+    info->tm_hour = (info->tm_hour + KST) % 24;// Korea standard time
+    strftime(time_str, 15,"[%I:%M:%S %p]",info);
+    printf("%s \"%s\" %s\n",time_str,  name,  message);
+}
 
 void checkDirectory(char *directory){
     DIR *d;
@@ -39,7 +49,7 @@ void checkDirectory(char *directory){
                 }
             }
             if(!available){
-                printf("not allowed file [%s] has deleted!\n",dir->d_name);
+                alert(dir->d_name, "not allowed file has been deleted!");
                 remove(full_path);
             }
         }
@@ -48,7 +58,6 @@ void checkDirectory(char *directory){
 }
 
 void init(){
-    printf("Watchdog is running \nPress Enter to exit\n");
     first_compare = true;
     strcpy(filename[0],"/home/dlfltltm/workspace");
     strcpy(filename[1],"/home/dlfltltm/workspace/subdir1");
@@ -62,10 +71,6 @@ void init(){
     strcpy(filename[9],"/home/dlfltltm/workspace/subdir2/ggg.txt");
     strcpy(filename[10],"/home/dlfltltm/workspace/watchdog");
     strcpy(filename[11],"/home/dlfltltm/workspace/watchdog.c");
-}
-
-void alert(char* name, char *message){
-    printf("[%s] %s\n", name,  message);
 }
 
 void get_stat(){
@@ -95,22 +100,20 @@ int check10(){
     }
     for(int i = 0 ; i < 10 ; i++){
         if(prev_stat[i].st_mtime != cur_stat[i].st_mtime){
-            printf("%ld != %ld\n",prev_stat[i].st_mtime, cur_stat[i].st_mtime);
-            alert(filename[i], " last modification time discordance!");
+            alert(filename[i], "last modification time changed!");
         }
         if(prev_stat[i].st_atime != cur_stat[i].st_atime){
-            alert(filename[i], " last access time discordance!");
+            alert(filename[i], "last access time changed!");
         }
         if(prev_stat[i].st_size != cur_stat[i].st_size){
-            alert(filename[i], " file size discordance!");
+            alert(filename[i], "file size changed!");
         }
         if(prev_stat[i].st_uid != cur_stat[i].st_uid){
-            alert(filename[i], " file uid discordance!");
+            alert(filename[i], "file uid changed!");
         }
         if(prev_stat[i].st_gid != cur_stat[i].st_gid){
-            alert(filename[i], " file gid discordance!");
+            alert(filename[i], "file gid changed!");
         }
-
     }
     return 1;
 }
@@ -123,6 +126,7 @@ void timer_handler(int signo){
 }
 
 int main(){
+    printf("Watchdog is running. Press Enter to exit\n");
     init();
     signal(SIGALRM,timer_handler);
     alarm(5);
