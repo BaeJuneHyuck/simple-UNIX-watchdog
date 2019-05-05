@@ -27,24 +27,28 @@ void checkDirectory(char *directory){
                 //printf(" [%s] is directory\n",dir->d_name);
                 continue;
             }
-            char temp[MAX_PATH];
-            strcpy(temp,directory);
-            strcat(temp,"/");
-            strcat(temp,dir->d_name);
+            char full_path[MAX_PATH];
+            strcpy(full_path, directory);
+            strcat(full_path, "/");
+            strcat(full_path, dir->d_name);
             bool available = false;
             for(int i = 0 ; i < 12 ; i ++){
-                if(strcmp(temp, filename[i]) == 0) {
+                if(strcmp(full_path, filename[i]) == 0) {
                     available = true;
                     break;
                 }
             }
-            if(!available) printf("not allowed file [%s] has deleted!\n",dir->d_name);
+            if(!available){
+                printf("not allowed file [%s] has deleted!\n",dir->d_name);
+                remove(full_path);
+            }
         }
         closedir(d);
     }
 }
 
 void init(){
+    printf("Watchdog is running \nPress Enter to exit\n");
     first_compare = true;
     strcpy(filename[0],"/home/dlfltltm/workspace");
     strcpy(filename[1],"/home/dlfltltm/workspace/subdir1");
@@ -61,7 +65,7 @@ void init(){
 }
 
 void alert(char* name, char *message){
-    printf("%s: %s\n", name,  message);
+    printf("[%s] %s\n", name,  message);
 }
 
 void get_stat(){
@@ -84,7 +88,6 @@ int check5(){
 
 int check10(){
     check5();
-    printf("every 10 seconds\n");
     get_stat();
     if(first_compare){
         first_compare = false;
@@ -93,19 +96,19 @@ int check10(){
     for(int i = 0 ; i < 10 ; i++){
         if(prev_stat[i].st_mtime != cur_stat[i].st_mtime){
             printf("%ld != %ld\n",prev_stat[i].st_mtime, cur_stat[i].st_mtime);
-            alert(filename[i], "last modification time discordance!");
+            alert(filename[i], " last modification time discordance!");
         }
         if(prev_stat[i].st_atime != cur_stat[i].st_atime){
-            alert(filename[i], "last access time discordance!");
+            alert(filename[i], " last access time discordance!");
         }
         if(prev_stat[i].st_size != cur_stat[i].st_size){
-            alert(filename[i], "file size discordance!");
+            alert(filename[i], " file size discordance!");
         }
         if(prev_stat[i].st_uid != cur_stat[i].st_uid){
-            alert(filename[i], "file uid discordance!");
+            alert(filename[i], " file uid discordance!");
         }
         if(prev_stat[i].st_gid != cur_stat[i].st_gid){
-            alert(filename[i], "file gid discordance!");
+            alert(filename[i], " file gid discordance!");
         }
 
     }
@@ -123,8 +126,12 @@ int main(){
     init();
     signal(SIGALRM,timer_handler);
     alarm(5);
+    getchar();
+/*
     while(1){
         pause();
     }   
+*/
+    printf("Watchdog is terminated\n");
     return 0; 
 }
