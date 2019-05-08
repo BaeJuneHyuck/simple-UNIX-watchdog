@@ -16,6 +16,25 @@ int check_type = 0;
 bool first_compare = true;
 char filename[12][MAX_PATH];
 
+void alert(char* name, char *message);
+void checkDirectory(char *directory);
+void init();
+void get_stat();
+int check5();
+int check10();
+void timer_handler(int signo);
+
+int main(){
+    alert("Watchdog", "is running. Press Enter to exit\n");
+    init();
+    get_stat();
+    signal(SIGALRM,timer_handler);
+    alarm(5);
+    getchar();
+    printf("Watchdog is terminated\n");
+    return 0; 
+}
+
 // print current time, filename  and message
 void alert(char* name, char *message){
     time_t t;
@@ -160,15 +179,4 @@ void timer_handler(int signo){
         check10();
     }
     alarm(5);
-}
-
-int main(){
-    alert("Watchdog", "is running. Press Enter to exit\n");
-    init();
-    get_stat();
-    signal(SIGALRM,timer_handler);
-    alarm(5);
-    getchar();
-    printf("Watchdog is terminated\n");
-    return 0; 
 }
