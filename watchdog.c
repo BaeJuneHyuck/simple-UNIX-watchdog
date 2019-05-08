@@ -13,7 +13,9 @@
 #define KST 9
 struct stat cur_stat[10];   // 3 directories, 7 files
 struct stat prev_stat[10];  // previous stat
-bool first_compare;
+bool file_name_changed[10];
+int check_type = 0;
+bool first_compare = true;
 char filename[12][MAX_PATH];
 
 void alert(char* name, char *message){
@@ -49,8 +51,19 @@ void checkDirectory(char *directory){
                 }
             }
             if(!available){
-                alert(dir->d_name, "not allowed file has been deleted!");
-                remove(full_path);
+                bool find_original_file = false;
+                for(int i = 0 ; i< 10; i++){
+                    // when a new file with an unauthorized name is found,
+                    // check file size, access time, modify time
+                    // of exisiting file. in case of a match
+                    // it was the exisitg file, do not delete
+                    // change the file name to new one
+                    // if not, delete
+                }
+                if(!find_original_file){
+                    alert(dir->d_name, "not allowed file has been deleted!");
+                    remove(full_path);
+                }
             }
         }
         closedir(d);
@@ -80,11 +93,13 @@ void get_stat(){
         if(stat(filename[i], &cur_stat[i]) < 0 ){
             //perror("stat error ");
             alert(filename[i], "file name changed!");
+            file_name_changed[i] = true;
         }
     }
 }
 
 int check5(){
+    printf("5sec\n");
     checkDirectory(filename[0]);
     checkDirectory(filename[1]);
     checkDirectory(filename[2]);
@@ -92,7 +107,7 @@ int check5(){
 }
 
 int check10(){
-    check5();
+    printf("10sec\n");
     get_stat();
     if(first_compare){
         first_compare = false;
@@ -119,9 +134,11 @@ int check10(){
 }
 
 void timer_handler(int signo){
+    check_type = (check_type+1) % 2;
     check5();
-    sleep(5);
-    check10();
+    if(check_type == 0){ // 10sec
+        check10();
+    }
     alarm(5);
 }
 
