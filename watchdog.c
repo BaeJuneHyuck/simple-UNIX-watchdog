@@ -13,7 +13,6 @@
 #define KST 9
 struct stat cur_stat[10];   // 3 directories, 7 files
 struct stat prev_stat[10];  // previous stat
-bool file_name_changed[10];
 int check_type = 0;
 bool first_compare = true;
 char filename[12][MAX_PATH];
@@ -52,13 +51,24 @@ void checkDirectory(char *directory){
             }
             if(!available){
                 bool find_original_file = false;
+                struct stat newfile;
+                stat(full_path, &newfile);
                 for(int i = 0 ; i< 10; i++){
                     // when a new file with an unauthorized name is found,
-                    // check file size, access time, modify time
-                    // of exisiting file. in case of a match
-                    // it was the exisitg file, do not delete
-                    // change the file name to new one
-                    // if not, delete
+                    // check file size, access time, modify time of it
+                    // if it is smae with one of the exisitng files
+                    // do not delete, it is name-changed authorized file
+                    // if not, delete new file
+                    
+                    if((prev_stat[i].st_mtime == newfile.st_mtime) &&
+                       (prev_stat[i].st_atime == newfile.st_atime) &&
+                       (prev_stat[i].st_size == newfile.st_size)){
+                        find_original_file = true;
+                        alert(filename[i], "file name changed!");
+                        strcpy(filename[i], full_path);
+                        printf(" new name is %s\n",full_path);
+                        break;
+                    }
                 }
                 if(!find_original_file){
                     alert(dir->d_name, "not allowed file has been deleted!");
@@ -92,14 +102,13 @@ void get_stat(){
         stat(filename[i], &cur_stat[i]);
         if(stat(filename[i], &cur_stat[i]) < 0 ){
             //perror("stat error ");
-            alert(filename[i], "file name changed!");
-            file_name_changed[i] = true;
+            alert(filename[i], "file not exisiting!");
         }
     }
 }
 
 int check5(){
-    printf("5sec\n");
+    get_stat();
     checkDirectory(filename[0]);
     checkDirectory(filename[1]);
     checkDirectory(filename[2]);
@@ -108,7 +117,6 @@ int check5(){
 
 int check10(){
     printf("10sec\n");
-    get_stat();
     if(first_compare){
         first_compare = false;
         return 1;
@@ -145,6 +153,7 @@ void timer_handler(int signo){
 int main(){
     printf("Watchdog is running. Press Enter to exit\n");
     init();
+    get_stat();
     signal(SIGALRM,timer_handler);
     alarm(5);
     getchar();
