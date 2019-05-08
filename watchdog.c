@@ -7,7 +7,6 @@
 #include <time.h>       // time
 #include <stdbool.h>    // boolean type for c90
 #include <dirent.h>     // list all file
-#include <errno.h>
 
 #define MAX_PATH 100
 #define KST 9
@@ -17,6 +16,7 @@ int check_type = 0;
 bool first_compare = true;
 char filename[12][MAX_PATH];
 
+// print current time, filename  and message
 void alert(char* name, char *message){
     time_t t;
     struct tm *info;
@@ -28,14 +28,17 @@ void alert(char* name, char *message){
     printf("%s \"%s\" %s\n",time_str,  name,  message);
 }
 
+// check target directory 
+// find not allowed file/directory and delete
+// if the file is name changed allowed file, report and save new name
 void checkDirectory(char *directory){
     DIR *d;
     struct dirent *dir;
     d = opendir(directory);
     if(d){
         while((dir = readdir(d)) != NULL){
-            if(dir->d_type == DT_DIR){
-                //printf(" [%s] is directory\n",dir->d_name);
+            if(dir->d_type == DT_DIR && dir->d_name[0] =='.'){
+                // exception : current directory, parent directory
                 continue;
             }
             char full_path[MAX_PATH];
@@ -44,7 +47,7 @@ void checkDirectory(char *directory){
             strcat(full_path, dir->d_name);
             bool available = false;
             for(int i = 0 ; i < 12 ; i ++){
-                if(strcmp(full_path, filename[i]) == 0) {
+                if(strcmp(full_path, filename[i]) == 0){
                     available = true;
                     break;
                 }
@@ -64,14 +67,20 @@ void checkDirectory(char *directory){
                        (prev_stat[i].st_atime == newfile.st_atime) &&
                        (prev_stat[i].st_size == newfile.st_size)){
                         find_original_file = true;
-                        alert(filename[i], "file name changed!");
+                        if(dir->d_type == DT_DIR)
+                            alert(filename[i], "directory name changed!");
+                        else 
+                            alert(filename[i], "file name changed!");
                         strcpy(filename[i], full_path);
                         printf(" new name is %s\n",full_path);
                         break;
                     }
                 }
                 if(!find_original_file){
-                    alert(dir->d_name, "not allowed file has been deleted!");
+                    if(dir->d_type == DT_DIR)
+                        alert(dir->d_name, "not allowed directory has been deleted!");
+                    else 
+                        alert(dir->d_name, "not allowed file has been deleted!");
                     remove(full_path);
                 }
             }
@@ -82,6 +91,7 @@ void checkDirectory(char *directory){
 
 void init(){
     first_compare = true;
+    // allowed files, directories name
     strcpy(filename[0],"/home/dlfltltm/workspace");
     strcpy(filename[1],"/home/dlfltltm/workspace/subdir1");
     strcpy(filename[2],"/home/dlfltltm/workspace/subdir2");
@@ -92,6 +102,7 @@ void init(){
     strcpy(filename[7],"/home/dlfltltm/workspace/subdir1/eee.txt");
     strcpy(filename[8],"/home/dlfltltm/workspace/subdir2/fff.txt");
     strcpy(filename[9],"/home/dlfltltm/workspace/subdir2/ggg.txt");
+    // exception
     strcpy(filename[10],"/home/dlfltltm/workspace/watchdog");
     strcpy(filename[11],"/home/dlfltltm/workspace/watchdog.c");
 }
@@ -101,25 +112,23 @@ void get_stat(){
         prev_stat[i] = cur_stat[i];
         stat(filename[i], &cur_stat[i]);
         if(stat(filename[i], &cur_stat[i]) < 0 ){
-            //perror("stat error ");
             alert(filename[i], "file not exisiting!");
         }
     }
 }
 
 int check5(){
-    get_stat();
     checkDirectory(filename[0]);
     checkDirectory(filename[1]);
     checkDirectory(filename[2]);
-    return 1;
+    return 0;
 }
 
 int check10(){
-    printf("10sec\n");
+    get_stat();
     if(first_compare){
         first_compare = false;
-        return 1;
+        return 0;
     }
     for(int i = 0 ; i < 10 ; i++){
         if(prev_stat[i].st_mtime != cur_stat[i].st_mtime){
@@ -130,15 +139,18 @@ int check10(){
         }
         if(prev_stat[i].st_size != cur_stat[i].st_size){
             alert(filename[i], "file size changed!");
+            printf(" old size = %li, new size= %li\n", prev_stat[i].st_size, cur_stat[i].st_size);
         }
         if(prev_stat[i].st_uid != cur_stat[i].st_uid){
             alert(filename[i], "file uid changed!");
+            printf(" old uid = %i, new uid = %i\n", prev_stat[i].st_uid, cur_stat[i].st_uid);
         }
         if(prev_stat[i].st_gid != cur_stat[i].st_gid){
             alert(filename[i], "file gid changed!");
+            printf(" old gid = %i, new gid = %i\n", prev_stat[i].st_gid, cur_stat[i].st_gid);
         }
     }
-    return 1;
+    return 0;
 }
 
 void timer_handler(int signo){
@@ -151,17 +163,12 @@ void timer_handler(int signo){
 }
 
 int main(){
-    printf("Watchdog is running. Press Enter to exit\n");
+    alert("Watchdog", "is running. Press Enter to exit\n");
     init();
     get_stat();
     signal(SIGALRM,timer_handler);
     alarm(5);
     getchar();
-/*
-    while(1){
-        pause();
-    }   
-*/
     printf("Watchdog is terminated\n");
     return 0; 
 }
